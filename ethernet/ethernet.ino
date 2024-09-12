@@ -57,42 +57,37 @@
   #define ETH_PHY_POWER       GPIO_RMII_PWR
   #define ETH_CLK_MODE        ETH_CLOCK_GPIO17_OUT
 
-uint8_t mac[6] = {0xbc, 0x34, 0x00, 0x00, 0x00, 0x01};
 //// eth event callback
 int eth_connected = false;
-void EthEvent(WiFiEvent_t event){
-  switch (event)
-  {
+// WARNING: onEvent is called from a separate FreeRTOS task (thread)!
+void onEvent(arduino_event_id_t event) {
+  switch (event) {
     case ARDUINO_EVENT_ETH_START:
       Serial.println("ETH Started");
+      // The hostname must be set after the interface is started, but needs
+      // to be set before DHCP, so set it from the event handler thread.
       ETH.setHostname("esp32-ethernet-dt");
-    break;
-    case ARDUINO_EVENT_ETH_CONNECTED:
-      Serial.println("ETH Connected");
-    break;
+      break;
+    case ARDUINO_EVENT_ETH_CONNECTED: Serial.println("ETH Connected"); break;
     case ARDUINO_EVENT_ETH_GOT_IP:
-      Serial.print("ETH MAC: ");
-      Serial.println(ETH.macAddress());
-      Serial.print("IPv4: ");
-      Serial.println(ETH.localIP());
-      if (ETH.fullDuplex()){
-        Serial.print("FULL_DUPLEX");
-      }
-      Serial.print(" ");
-      Serial.print(ETH.linkSpeed());
-      Serial.println("Mbps");
+      Serial.println("ETH Got IP");
+      Serial.println(ETH);
       eth_connected = true;
-    break;
-    case ARDUINO_EVENT_ETH_DISCONNECTED:
-      Serial.println("\nETH Disconnected");
+      break;
+    case ARDUINO_EVENT_ETH_LOST_IP:
+      Serial.println("ETH Lost IP");
       eth_connected = false;
-    break;
+      break;
+    case ARDUINO_EVENT_ETH_DISCONNECTED:
+      Serial.println("ETH Disconnected");
+      eth_connected = false;
+      break;
     case ARDUINO_EVENT_ETH_STOP:
       Serial.println("ETH Stopped");
       eth_connected = false;
-    break;
+      break;
     default:
-    break;
+      break;
   }
 }
 
@@ -103,8 +98,8 @@ void setup() {
 
   // ethernet init
   Serial.println("Ethernet Init >>>>");
-  WiFi.onEvent(EthEvent);
-  ETH.begin(ETH_PHY_ADDR, ETH_PHY_POWER, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_TYPE, ETH_CLK_MODE, true);
+  Network.onEvent(onEvent);
+  ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_MDC, ETH_PHY_MDIO, ETH_PHY_POWER, ETH_CLK_MODE);
   ETH.config(IPAddress(192,168,1,100),IPAddress(192,168,1,1),IPAddress(255,255,255,0),IPAddress(192,168,1,1), IPAddress(192,168,1,1));
   Serial.println("Ethernet Init <<<<");
 
